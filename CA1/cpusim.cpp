@@ -1,88 +1,87 @@
 #include "CPU.h"
-
 #include <iostream>
-#include <bitset>
-#include <stdio.h>
-#include<stdlib.h>
-#include <string>
-#include<fstream>
+#include <fstream>
 #include <sstream>
+#include <string>
+#include <algorithm> 
 using namespace std;
 
-/*
-Add all the required standard and developed libraries here
-*/
+int main(int argc, char* argv[]) {
+    // Ensure an input file is provided
+    if (argc < 2) {
+        cout << "No file name entered. Exiting..." << endl;
+        return -1;
+    }
 
-/*
-Put/Define any helper function/definitions you need here
-*/
-int main(int argc, char* argv[])
-{
-	/* This is the front end of your project.
-	You need to first read the instructions that are stored in a file and load them into an instruction memory.
-	*/
+    // Open the input file
+    ifstream infile(argv[1]);
+    if (!infile.is_open()) {
+        cout << "Error opening file." << endl;
+        return 0;
+    }
 
-	/* Each cell should store 1 byte. You can define the memory either dynamically, or define it as a fixed size with size 4KB (i.e., 4096 lines). Each instruction is 32 bits (i.e., 4 lines, saved in little-endian mode).
-	Each line in the input file is stored as an hex and is 1 byte (each four lines are one instruction). You need to read the file line by line and store it into the memory. You may need a mechanism to convert these values to bits so that you can read opcodes, operands, etc.
-	*/
+    // Initialize instruction memory (4KB = 4096 bytes)
+    char instMem[4096] = {0};
 
-	char instMem[4096];
+    // Read the input file line by line and load into instruction memory
+    string line;
+    int memIndex = 0;
+    while (getline(infile, line)) {
+        // Skip empty lines or lines starting with '#'
+        if (line.empty() || line[0] == '#')
+            continue;
 
+        // Remove whitespaces and newline characters
+        line.erase(remove(line.begin(), line.end(), ' '), line.end());
+        line.erase(remove(line.begin(), line.end(), '\n'), line.end());
+        line.erase(remove(line.begin(), line.end(), '\r'), line.end());
 
-	if (argc < 2) {
-		//cout << "No file name entered. Exiting...";
-		return -1;
-	}
+        if (line.empty())
+            continue;
 
-	ifstream infile(argv[1]); //open the file
-	if (!(infile.is_open() && infile.good())) {
-		cout<<"error opening file\n";
-		return 0; 
-	}
-	string line; 
-	int i = 0;
-	while (infile) {
-			infile>>line;
-			stringstream line2(line);
-			char x; 
-			line2>>x;
-			instMem[i] = x; // be careful about hex
-			i++;
-			line2>>x;
-			instMem[i] = x; // be careful about hex
-			cout<<instMem[i]<<endl;
-			i++;
-		}
-	int maxPC= i/4; 
+        // Convert the hex string to an integer
+        int byteValue = stoi(line, nullptr, 16);
 
-	/* Instantiate your CPU object here.  CPU class is the main class in this project that defines different components of the processor.
-	CPU class also has different functions for each stage (e.g., fetching an instruction, decoding, etc.).
-	*/
+        // Store the byte in instruction memory
+        if (memIndex < 4096) {
+            instMem[memIndex++] = static_cast<char>(byteValue);
+        } else {
+            cout << "Instruction memory overflow." << endl;
+            break;
+        }
+    }
 
-	CPU myCPU;  // call the approriate constructor here to initialize the processor...  
-	// make sure to create a variable for PC and resets it to zero (e.g., unsigned int PC = 0); 
+    // Set the maximum PC value (total bytes loaded)
+    int maxPC = memIndex;
 
-	/* OPTIONAL: Instantiate your Instruction object here. */
-	//Instruction myInst; 
-	
-	bool done = true;
-	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.  
-	{
-		//fetch
-		
+    // Create a CPU instance and initialize it
+    CPU myCPU;
 
-		// decode
-		
-		// ... 
-		myCPU.incPC();
-		if (myCPU.readPC() > maxPC)
-			break;
-	}
-	int a0 =0;
-	int a1 =0;  
-	// print the results (you should replace a0 and a1 with your own variables that point to a0 and a1)
-	  cout << "(" << a0 << "," << a1 << ")" << endl;
-	
-	return 0;
+    // Processor's main loop (each iteration = one clock cycle)
+    while (true) {
+        // Fetch the next instruction from memory
+        unsigned long pc = myCPU.readPC();
+        if (pc + 3 >= 4096) {
+            cout << "Program Counter out of bounds." << endl;
+            break;
+        }
 
+        int instruction = myCPU.fetch(instMem, pc);
+
+        // Execute the fetched instruction
+        myCPU.executeInstruction(instruction);
+
+        // Break if we reach the end of the instructions
+        if (myCPU.readPC() >= (unsigned long)maxPC) {
+            break;
+        }
+    }
+    // Retrieve and print the values of a0 (x10) and a1 (x11) registers
+    int a0 = myCPU.registers[10];  // Register a0 (x10)
+    int a1 = myCPU.registers[11];  // Register a1 (x11)
+
+    // Print the final result in the required format "(a0,a1)"
+    cout << "(" << a0 << "," << a1 << ")" << endl;
+
+    return 0;
 }
